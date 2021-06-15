@@ -1,49 +1,62 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
+	"os"
+	"log"
+	"encoding/json"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-var (
-	// DefaultHTTPGetAddress Default Address
-	DefaultHTTPGetAddress = "https://checkip.amazonaws.com"
-
-	// ErrNoIP No IP found in response
-	ErrNoIP = errors.New("No IP in HTTP response")
-
-	// ErrNon200Response non 200 status code in response
-	ErrNon200Response = errors.New("Non 200 Response found")
-)
+type Request struct {
+	Log string `json:"log"`
+}
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	resp, err := http.Get(DefaultHTTPGetAddress)
+
+	token := "Bot " + os.Getenv("TOKEN")
+	channelID := os.Getenv("CANNEL_ID")
+	fmt.Print(token)
+
+	var req Request
+	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
+		panic(err)
+	}
+
+	dg, err := discordgo.New(token)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
+		fmt.Println("Error creating Discord")
+		return events.APIGatewayProxyResponse{
+			Body:       err.Error(),
+			StatusCode: 500,
+		}, err
 	}
 
-	if resp.StatusCode != 200 {
-		return events.APIGatewayProxyResponse{}, ErrNon200Response
+	if err := dg.Open(); err != nil {
+		fmt.Println("Error opening connection", err)
+		return events.APIGatewayProxyResponse{
+			Body:       err.Error(),
+			StatusCode: 500,
+		}, err
 	}
+	defer dg.Close()
 
-	ip, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	if len(ip) == 0 {
-		return events.APIGatewayProxyResponse{}, ErrNoIP
-	}
+	sendLog(dg, channelID, req.Log)
 
 	return events.APIGatewayProxyResponse{
-		Body:       fmt.Sprintf("Hello, %v", string(ip)),
+		Body:       "Hello",
 		StatusCode: 200,
 	}, nil
+}
+
+func sendLog(s *discordgo.Session, channelID string, msg string) {
+	_, err := s.ChannelMessageSend(channelID, msg)
+	if err != nil {
+		log.Println("Error sending message: ", err)
+	}
 }
 
 func main() {
