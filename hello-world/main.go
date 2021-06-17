@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -27,16 +30,13 @@ func handler(ctx context.Context, request Request) (string, error) {
 	token := "Bot " + os.Getenv("TOKEN")
 	channelID := os.Getenv("CHANNEL_ID")
 
-	log.Println(request.AwsLogs.Data)
-
-	byteData, err := base64.StdEncoding.DecodeString(request.AwsLogs.Data)
-	var logData LogData
-	if err := json.Unmarshal(byteData, &logData); err != nil {
-		return handleErr("Error decoding logData", err)
-	}
-
+	data, err := decode(request.AwsLogs.Data)
 	if err != nil {
-		return handleErr("Error decoding request", err)
+		return handleErr("Error decoding", err)
+	}
+	var logData LogData
+	if err = json.Unmarshal(data, &logData); err != nil {
+		return handleErr("Error unmarshal logData", err)
 	}
 
 	dg, err := discordgo.New(token)
@@ -52,6 +52,18 @@ func handler(ctx context.Context, request Request) (string, error) {
 	sendLog(dg, channelID, logData.LogEvents[0].Message)
 
 	return "success", nil
+}
+
+func decode(data string) ([]byte, error) {
+	byteData, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return nil, err
+	}
+
+	rdata := bytes.NewReader(byteData)
+	reader, _ := gzip.NewReader(rdata)
+	b, _ := ioutil.ReadAll(reader)
+	return b, nil
 }
 
 func sendLog(s *discordgo.Session, channelID string, msg string) {
