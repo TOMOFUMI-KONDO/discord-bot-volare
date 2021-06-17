@@ -16,10 +16,8 @@ type Request struct {
 }
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-
 	token := "Bot " + os.Getenv("TOKEN")
-	channelID := os.Getenv("CANNEL_ID")
-	fmt.Print(token)
+	channelID := os.Getenv("CHANNEL_ID")
 
 	var req Request
 	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
