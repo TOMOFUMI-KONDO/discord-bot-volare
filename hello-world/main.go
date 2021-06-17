@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"context"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -23,21 +24,13 @@ type LogData struct {
 	} `json:"logEvents"`
 }
 
-func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func handler(ctx context.Context, request Request) (events.APIGatewayProxyResponse, error) {
 	token := "Bot " + os.Getenv("TOKEN")
 	channelID := os.Getenv("CHANNEL_ID")
 
-	log.Println(request.Body)
-	var req Request
-	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
-		log.Println("Error decoding reqBody", err)
-		return events.APIGatewayProxyResponse{
-			Body:       err.Error(),
-			StatusCode: 500,
-		}, err
-	}
+	log.Println(request)
 
-	byteData, err := base64.StdEncoding.DecodeString(req.AwsLogs.Data)
+	byteData, err := base64.StdEncoding.DecodeString(request.AwsLogs.Data)
 	var logData LogData
 	if err := json.Unmarshal(byteData, &logData); err != nil {
 		log.Println("Error decoding logData", err)
